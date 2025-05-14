@@ -1,5 +1,5 @@
 # Cryptocurrency Analysis Suite
-
+![](https://github.com/rahulkumargit1/Cryptocurrency-Analysis-Suite/blob/main/CRYPTO.jpg)
 A Flask-based web application for advanced cryptocurrency analysis, leveraging machine learning for price predictions and technical indicators for market insights.
 
 ## Overview

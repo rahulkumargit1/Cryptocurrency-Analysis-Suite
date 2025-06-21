@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Advanced cryptocurrency analysis platform with ML-driven price predictions and technical analysis">
+    <meta name="keywords" content="cryptocurrency, price prediction, technical analysis, machine learning, crypto trading">
+    <meta name="author" content="Rahul Kumar, Prakruthi Shetty, Nidhisha Shetty, Arpan Shetty">
+    <meta name="robots" content="index, follow">
+    <!-- Open Graph Tags for Social Media -->
+    <meta property="og:title" content="Cryptocurrency Analysis Suite">
+    <meta property="og:description" content="Advanced ML-Driven Prediction & Technical Analysis Platform">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="{{ url_for('static', filename='images/favicon.png') }}">
+
+    <title>Cryptocurrency Price Prediction & Analysis</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            position: relative;
+        }
+
+        /* Matrix Loading Effect Styles */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(26, 26, 46, 0.95);
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        #loading-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #loading-overlay.hide {
+            opacity: 0;
+        }
+
+        #matrix-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .page-header {
+            padding: 50px 0;
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .page-header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #00d4ff;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+            margin-bottom: 15px;
+        }
+
+        .page-header p {
+            font-size: 1.3rem;
+            color: #a0a0c0;
+            font-weight: 300;
+        }
+
+        .form-container {
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            margin-bottom: 50px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .form-label {
+            font-weight: 500;
+            color: #e0e0e0;
+            margin-bottom: 12px;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .form-control {
+            padding: 12px 12px 12px 40px;
+            border: none;
+            font-size: 1rem;
+            background: #2a2a4a;
+            color: #e0e0e0;
+            flex: 1;
+            height: 48px;
+            transition: all 0.3s ease;
+            border-radius: 8px 0 0 8px;
+            position: relative;
+        }
+
+        .form-control:focus {
+            outline: none;
+            box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);
+            background: #33335a;
+        }
+
+        .form-control.invalid {
+            box-shadow: 0 0 8px rgba(220, 53, 69, 0.5);
+        }
+
+        .input-group-text {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a0a0c0;
+            background: transparent;
+            border: none;
+            z-index: 10;
+        }
+
+        .btn-submit {
+            padding: 0 24px;
+            background: linear-gradient(45deg, #007bff, #00d4ff);
+            color: white;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            height: 48px;
+            line-height: 48px;
+            transition: all 0.3s ease;
+            border-radius: 0 8px 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-submit:hover {
+            background: linear-gradient(45deg, #0056b3, #00b4d8);
+            transform: translateY(-2px);
+        }
+
+        .btn-submit i {
+            margin-right: 8px;
+        }
+
+        .analyze-btn-container {
+            display: flex;
+            align-items: center;
+            width: auto;
+        }
+
+        @media (max-width: 767px) {
+            .analyze-btn-container {
+                margin-top: 20px;
+                justify-content: center;
+            }
+            .form-control, .btn-submit {
+                width: 100%;
+                border-radius: 8px;
+            }
+            .row.align-items-center {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .btn-submit {
+                margin-left: 0;
+                margin-top: 15px;
+            }
+            .input-group {
+                flex-direction: column;
+                align-items: stretch;
+                margin-bottom: 20px;
+            }
+            .input-group .form-control {
+                border-radius: 8px;
+            }
+            .btn-submit {
+                border-radius: 8px;
+            }
+        }
+
+        .stock-details {
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            margin-bottom: 50px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .stock-details h3 {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #00d4ff;
+            margin-bottom: 20px;
+        }
+
+        .stock-details p {
+            font-size: 1.1rem;
+            color: #a0a0c0;
+            margin-bottom: 15px;
+        }
+
+        .chart-card {
+            margin-bottom: 50px;
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .chart-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chart-header h3 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 500;
+            color: #e0e0e0;
+        }
+
+        .tooltip-custom {
+            position: relative;
+        }
+
+        .tooltip-custom .tooltip-text {
+            visibility: hidden;
+            width: 220px;
+            background: #33335a;
+            color: #e0e0e0;
+            text-align: center;
+            border-radius: 8px;
+            padding: 12px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .tooltip-custom:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .badge {
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .bg-primary {
+            background: linear-gradient(45deg, #007bff, #00d4ff);
+            color: white;
+        }
+
+        .bg-info {
+            background: linear-gradient(45deg, #17a2b8, #48cae4);
+            color: white;
+        }
+
+        .bg-warning {
+            background: linear-gradient(45deg, #ffc107, #ffd60a);
+            color: #1a1a2e;
+        }
+
+        .bg-success {
+            background: linear-gradient(45deg, #28a745, #52b788);
+            color: white;
+        }
+
+        .bg-danger {
+            background: linear-gradient(45deg, #dc3545, #e63946);
+            color: white;
+        }
+
+        .chart-body {
+            padding: 30px;
+        }
+
+        .chart-body img {
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .download-container {
+            text-align: center;
+            margin: 50px 0;
+        }
+
+        .btn-download {
+            padding: 12px 24px;
+            background: linear-gradient(45deg, #28a745, #52b788);
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-download:hover {
+            background: linear-gradient(45deg, #218838, #4a9e6e);
+            transform: translateY(-2px);
+        }
+
+        .btn-download i {
+            margin-right: 8px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px 0;
+            margin-top: 50px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: #a0a0c0;
+        }
+
+        .team-banner {
+            padding: 30px;
+            margin: 50px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .team-banner h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: #00d4ff;
+        }
+
+        .team-members {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+        }
+
+        .team-member {
+            padding: 25px;
+            max-width: 320px;
+            width: 100%;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .team-member:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .member-photo {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            overflow: hidden;
+            border: 3px solid #00d4ff;
+        }
+
+        .member-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .member-name {
+            font-size: 1.4rem;
+            font-weight: 500;
+            color: #e0e0e0;
+            margin-bottom: 12px;
+        }
+
+        .member-usn {
+            font-size: 1rem;
+            color: #a0a0c0;
+            margin-bottom: 12px;
+        }
+
+        .member-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .member-links a {
+            color: #00d4ff;
+            font-size: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .member-links a:hover {
+            color: #00b4d8;
+            transform: scale(1.2);
+        }
+    </style>
+</head>
+<body>
+    <!-- Matrix Loading Overlay -->
+    <div id="loading-overlay">
+        <canvas id="matrix-canvas"></canvas>
+    </div>
+
+    <div class="container">
+        <div class="page-header text-center">
+            <h1>CRYPTOCURRENCY ANALYSIS SUITE</h1>
+            <p>Advanced ML-Driven Prediction & Technical Analysis Platform</p>
+        </div>
+
+        <div class="form-container">
+            <form method="POST" id="analysisForm" novalidate>
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-12">
+                        <label for="stock" class="form-label">Cryptocurrency Ticker</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-search" aria-label="Search"></i></span>
+                            <input type="text" class="form-control" id="stock" name="stock" 
+                                   value="{{ searched_ticker if searched_ticker else 'BTC-USD' }}" 
+                                   placeholder="Enter ticker symbol (e.g., BTC-USD, ETH-USD)"
+                                   aria-describedby="tickerHelp" 
+                                   pattern="[A-Z]{3,4}-USD"
+                                   required>
+                            <button type="submit" class="btn btn-submit">
+                                <i class="fas fa-chart-line" aria-label="Analyze"></i> Analyze
+                            </button>
+                        </div>
+                        <small id="tickerHelp" class="text-muted mt-2 d-block">Uses Yahoo Finance ticker format (e.g., BTC-USD, ETH-USD, SOL-USD)</small>
+                        <div class="error-message" id="stockError">Please enter a valid ticker (e.g., BTC-USD, ETH-USD)</div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        {% if searched_ticker and stock_details %}
+        <div class="stock-details">
+            <h3>{{ stock_details.name }} ({{ searched_ticker }})</h3>
+            <p><strong>Current Price:</strong> ${{ stock_details.current_price }}</p>
+            <p><strong>Description:</strong> {{ stock_details.description }}</p>
+        </div>
+
+        <!-- TradingView Widget -->
+        <div class="chart-card">
+            <div class="chart-header d-flex justify-content-between align-items-center">
+                <h3 class="tooltip-custom">
+                    <i class="fas fa-chart-bar" aria-label="Real-Time Chart"></i> Real-Time Chart
+                    <span class="tooltip-text">Live chart powered by TradingView</span>
+                </h3>
+                <span class="badge bg-success">TradingView</span>
+            </div>
+            <div class="chart-body">
+                <div class="tradingview-widget-container" style="height:500px; width:100%;">
+                    <div id="tradingview_widget" style="height:calc(100% - 32px); width:100%;"></div>
+                    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+                    <script type="text/javascript">
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const searchedTicker = "{{ searched_ticker }}".replace('-', '');
+                            if (searchedTicker) {
+                                new TradingView.widget({
+                                    "container_id": "tradingview_widget",
+                                    "width": "100%",
+                                    "height": 500,
+                                    "symbol": "BINANCE:" + searchedTicker,
+                                    "interval": "1",
+                                    "timezone": "Etc/UTC",
+                                    "theme": "dark",
+                                    "style": "1",
+                                    "locale": "en",
+                                    "toolbar_bg": "#1a1a2e",
+                                    "enable_publishing": false,
+                                    "allow_symbol_change": true,
+                                    "details": true,
+                                    "calendar": false,
+                                    "support_host": "https://www.tradingview.com",
+                                    "autosize": true
+                                });
+                            } else {
+                                document.getElementById('tradingview_widget').innerHTML = '<p class="text-muted">No ticker selected. Please enter a valid ticker (e.g., BTC-USD).</p>';
+                            }
+                        });
+                    </script>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if plot_path_ema_20_50 %}
+        <div class="chart-card">
+            <div class="chart-header d-flex justify-content-between align-items-center">
+                <h3 class="tooltip-custom">
+                    <i class="fas fa-chart-line" aria-label="Chart"></i> Short-Term Price Movement
+                    <span class="tooltip-text">Displays recent price trends with 20-day and 50-day Exponential Moving Averages for short-term market analysis</span>
+                </h3>
+                <span class="badge bg-primary">20 & 50 EMA</span>
+            </div>
+            <div class="chart-body">
+                <img src="{{ url_for('static', filename=plot_path_ema_20_50) }}" alt="Short-Term Price Movement Chart (20 & 50 EMA)" 
+                     class="img-fluid" loading="lazy">
+            </div>
+        </div>
+        {% endif %}
+
+        {% if plot_path_ema_100_200 %}
+        <div class="chart-card">
+            <div class="chart-header d-flex justify-content-between align-items-center">
+                <h3 class="tooltip-custom">
+                    <i class="fas fa-chart-area" aria-label="Chart"></i> Long-Term Market Trend
+                    <span class="tooltip-text">Shows extended price history with 100-day and 200-day EMAs to identify major market trends</span>
+                </h3>
+                <span class="badge bg-info">100 & 200 EMA</span>
+            </div>
+            <div class="chart-body">
+                <img src="{{ url_for('static', filename=plot_path_ema_100_200) }}" alt="Long-Term Market Trend Chart (100 & 200 EMA)" 
+                     class="img-fluid" loading="lazy">
+            </div>
+        </div>
+        {% endif %}
+
+        {% if plot_path_prediction %}
+        <div class="chart-card">
+            <div class="chart-header d-flex justify-content-between align-items-center">
+                <h3 class="tooltip-custom">
+                    <i class="fas fa-robot" aria-label="AI Prediction"></i> AI Price Prediction
+                    <span class="tooltip-text">Machine Learning predictions based on historical data using our custom deep learning model</span>
+                </h3>
+                <span class="badge bg-warning">Machine Learning Model</span>
+            </div>
+            <div class="chart-body">
+                <img src="{{ url_for('static', filename=plot_path_prediction) }}" alt="AI Price Prediction Chart" 
+                     class="img-fluid" loading="lazy">
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 30-Day Future Forecast Chart -->
+        {% if plot_future_forecast %}
+        <div class="chart-card">
+            <div class="chart-header d-flex justify-content-between align-items-center">
+                <h3 class="tooltip-custom">
+                    <i class="fas fa-forward" aria-label="Future Forecast"></i> 30-Day Price Forecast
+                    <span class="tooltip-text">AI-driven price forecast for the next 30 days with confidence intervals</span>
+                </h3>
+                <span class="badge bg-success">AI Forecast</span>
+            </div>
+            <div class="chart-body">
+                <img src="{{ url_for('static', filename=plot_future_forecast) }}" alt="30-Day Price Forecast Chart" 
+                     class="img-fluid" loading="lazy">
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Technical Indicators Chart (RSI and MACD) -->
+        {% if plot_technical_indicators %}
+        <div class="chart-card">
+            <div class="chart-header d-flex justify-content-between align-items-center">
+                <h3 class="tooltip-custom">
+                    <i class="fas fa-chart-pie" aria-label="Technical Indicators"></i> Technical Indicators
+                    <span class="tooltip-text">RSI and MACD indicators for momentum and trend analysis</span>
+                </h3>
+                <span class="badge bg-danger">RSI & MACD</span>
+            </div>
+            <div class="chart-body">
+                <img src="{{ url_for('static', filename=plot_technical_indicators) }}" alt="Technical Indicators Chart (RSI & MACD)" 
+                     class="img-fluid" loading="lazy">
+            </div>
+        </div>
+        {% endif %}
+
+        {% if dataset_link %}
+        <div class="download-container">
+            <a href="{{ url_for('download_file', filename=dataset_link.split('/')[-1]) }}" class="btn btn-download">
+                <i class="fas fa-file-csv" aria-label="Download CSV"></i> Export Historical Dataset
+            </a>
+        </div>
+        {% endif %}
+
+        <div class="team-banner">
+            <h2>Project Team Members</h2>
+            <div class="team-members">
+                <div class="team-member">
+                    <div class="member-photo">
+                        <img src="{{ url_for('static', filename='images/rahul-kumar.jpg') }}" alt="Rahul Kumar">
+                    </div>
+                    <h4 class="member-name">Rahul Kumar</h4>
+                    <div class="member-usn">USN: 4SH21CS104</div>
+                    <div class="member-links">
+                        <a href="https://www.linkedin.com/in/rahul-kumar-0a4645326" target="_blank" aria-label="Rahul Kumar's LinkedIn Profile"><i class="fab fa-linkedin"></i></a>
+                        <a href="mailto:rahul.kumar@gmail.com" aria-label="Email Rahul Kumar"><i class="fas fa-envelope"></i></a>
+                    </div>
+                </div>
+
+                <div class="team-member">
+                    <div class="member-photo">
+                        <img src="{{ url_for('static', filename='images/prakruthi-shetty.jpg') }}" alt="Prakruthi Shetty">
+                    </div>
+                    <h4 class="member-name">Prakruthi Shetty</h4>
+                    <div class="member-usn">USN: 4SH21CS102</div>
+                    <div class="member-links">
+                        <a href="https://www.linkedin.com/in/prakruthi-shetty-abbbb3252" target="_blank" aria-label="Prakruthi Shetty's LinkedIn Profile"><i class="fab fa-linkedin"></i></a>
+                        <a href="mailto:prakruthishetty72@gmail.com" aria-label="Email Prakruthi Shetty"><i class="fas fa-envelope"></i></a>
+                    </div>
+                </div>
+
+                <div class="team-member">
+                    <div class="member-photo">
+                        <img src="{{ url_for('static', filename='images/nidhisha-kava.jpg') }}" alt="Nidhisha Shetty">
+                    </div>
+                    <h4 class="member-name">Nidhisha Kava</h4>
+                    <div class="member-usn">USN: 4SH21CS094</div>
+                    <div class="member-links">
+                        <a href="https://www.linkedin.com/in/nidhisha-kava-686612271" target="_blank" aria-label="Nidhisha Shetty's LinkedIn Profile"><i class="fab fa-linkedin"></i></a>
+                        <a href="mailto:nidhishakava@gmail.com" aria-label="Email Nidhisha Shetty"><i class="fas fa-envelope"></i></a>
+                    </div>
+                </div>
+
+                <div class="team-member">
+                    <div class="member-photo">
+                        <img src="{{ url_for('static', filename='images/arpan-shetty.jpg') }}" alt="Arpan Shetty">
+                    </div>
+                    <h4 class="member-name">Arpan Shetty</h4>
+                    <div class="member-usn">USN: 4SH21CS023</div>
+                    <div class="member-links">
+                        <a href="mailto:shettyarpan4@gmail.com" aria-label="Email Arpan Shetty"><i class="fas fa-envelope"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>© 2025 Advanced Cryptocurrency Analysis Platform | Real-time Market Data & ML Predictions</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Matrix Loading Effect
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size
+        function resizeCanvas() {
+            canvas.height = window.innerHeight;
+            canvas.width = window.innerWidth;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Matrix effect variables
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=[]{}|;:,.<>?';
+        const fontSize = 14;
+        const columns = canvas.width / fontSize;
+        const drops = Array(Math.floor(columns)).fill(1);
+        const colors = ['#007bff', '#00b4d8', '#00d4ff'];
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(26, 26, 46, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars.charAt(Math.floor(Math.random() * chars.length));
+                const yPos = drops[i] * fontSize;
+
+                const gradient = ctx.createLinearGradient(0, yPos - fontSize, 0, yPos);
+                gradient.addColorStop(0, colors[0]);
+                gradient.addColorStop(0.5, colors[1]);
+                gradient.addColorStop(1, colors[2]);
+
+                ctx.fillStyle = gradient;
+                ctx.font = fontSize + 'px monospace';
+                ctx.fillText(text, i * fontSize, yPos);
+
+                if (yPos > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+
+        let matrixInterval;
+        function startMatrixEffect() {
+            const overlay = document.getElementById('loading-overlay');
+            overlay.classList.remove('hide');
+            overlay.classList.add('show');
+            matrixInterval = setInterval(drawMatrix, 50);
+        }
+
+        function stopMatrixEffect() {
+            clearInterval(matrixInterval);
+            const overlay = document.getElementById('loading-overlay');
+            overlay.classList.remove('show');
+            overlay.classList.add('hide');
+        }
+
+        // Form handling and loading effect
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('analysisForm');
+            const stockInput = document.getElementById('stock');
+            const errorMessage = document.getElementById('stockError');
+
+            form.addEventListener('submit', function(e) {
+                const tickerPattern = /^[A-Z]{3,4}-USD$/;
+                if (!tickerPattern.test(stockInput.value)) {
+                    e.preventDefault();
+                    stockInput.classList.add('invalid');
+                    errorMessage.style.display = 'block';
+                    return;
+                }
+
+                startMatrixEffect();
+            });
+
+            stockInput.addEventListener('input', function() {
+                const tickerPattern = /^[A-Z]{3,4}-USD$/;
+                if (tickerPattern.test(this.value) || this.value === '') {
+                    this.classList.remove('invalid');
+                    errorMessage.style.display = 'none';
+                }
+            });
+
+            // Check if all dynamic content is loaded
+            function checkAllContentLoaded() {
+                const stockDetails = document.querySelector('.stock-details');
+                const tradingViewWidget = document.getElementById('tradingview_widget');
+                const ema20_50 = document.querySelector('img[src*="{{ plot_path_ema_20_50 }}"]');
+                const ema100_200 = document.querySelector('img[src*="{{ plot_path_ema_100_200 }}"]');
+                const prediction = document.querySelector('img[src*="{{ plot_path_prediction }}"]');
+                const futureForecast = document.querySelector('img[src*="{{ plot_future_forecast }}"]');
+                const technicalIndicators = document.querySelector('img[src*="{{ plot_technical_indicators }}"]');
+
+                let allLoaded = true;
+
+                if (stockDetails) {
+                    allLoaded = allLoaded && stockDetails.innerHTML.trim() !== '';
+                }
+
+                if (tradingViewWidget) {
+                    allLoaded = allLoaded && tradingViewWidget.children.length > 0;
+                }
+
+                if (ema20_50) {
+                    allLoaded = allLoaded && ema20_50.complete && ema20_50.naturalHeight !== 0;
+                }
+                if (ema100_200) {
+                    allLoaded = allLoaded && ema100_200.complete && ema100_200.naturalHeight !== 0;
+                }
+                if (prediction) {
+                    allLoaded = allLoaded && prediction.complete && prediction.naturalHeight !== 0;
+                }
+                if (futureForecast) {
+                    allLoaded = allLoaded && futureForecast.complete && futureForecast.naturalHeight !== 0;
+                }
+                if (technicalIndicators) {
+                    allLoaded = allLoaded && technicalIndicators.complete && technicalIndicators.naturalHeight !== 0;
+                }
+
+                if (allLoaded) {
+                    stopMatrixEffect();
+                } else {
+                    setTimeout(checkAllContentLoaded, 100);
+                }
+            }
+
+            checkAllContentLoaded();
+
+            const chartBodies = document.querySelectorAll('.chart-body');
+            chartBodies.forEach(chart => {
+                if (!chart.querySelector('img') && !chart.querySelector('#tradingview_widget')) {
+                    chart.innerHTML = '<p>Loading chart...</p>';
+                } else {
+                    const img = chart.querySelector('img');
+                    if (img) {
+                        img.onerror = function() {
+                            chart.innerHTML = '<p class="text-muted">Failed to load chart. Please try again.</p>';
+                            stopMatrixEffect();
+                        };
+                    }
+                }
+            });
+
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/static/service-worker.js')
+                    .then(reg => console.log('Service Worker registered', reg))
+                    .catch(err => console.log('Service Worker registration failed', err));
+            }
+        });
+    </script>
+</body>
+</html>

@@ -86,16 +86,33 @@ def get_current_price(symbol):
         print(f"Error fetching current price: {e}")
         return None
 
-# Load the trained deep learning model
-model_path = os.path.join(os.path.dirname(__file__), 'models', 'stock_dl_model.keras')
-if not os.path.exists(model_path):
-    raise FileNotFoundError(f"Model file '{model_path}' not found. Ensure the model is placed in the 'models' directory.")
-try:
-    model = keras.models.load_model(model_path, compile=False)
+# Create a simple model if the trained model doesn't exist
+def create_simple_model():
+    model = keras.Sequential([
+        keras.layers.LSTM(50, return_sequences=True, input_shape=(100, 1)),
+        keras.layers.Dropout(0.2),
+        keras.layers.LSTM(50, return_sequences=True),
+        keras.layers.Dropout(0.2),
+        keras.layers.LSTM(50),
+        keras.layers.Dropout(0.2),
+        keras.layers.Dense(1)
+    ])
     model.compile(optimizer='rmsprop', loss='mse')
-except Exception as e:
-    print(f"Error loading model: {e}")
-    raise
+    return model
+
+# Load or create the model
+model_path = os.path.join(os.path.dirname(__file__), 'models', 'stock_dl_model.keras')
+if os.path.exists(model_path):
+    try:
+        model = keras.models.load_model(model_path, compile=False)
+        model.compile(optimizer='rmsprop', loss='mse')
+    except Exception as e:
+        print(f"Error loading model: {e}, creating new model")
+        model = create_simple_model()
+else:
+    print("Model file not found, creating new model")
+    Path("models").mkdir(exist_ok=True)
+    model = create_simple_model()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -213,7 +230,7 @@ def index():
         ax1.plot(ema50_recent, 'r', label='EMA 50')
         ax1.set_title("Short-Term (Last 365 Days, 20 & 50 Days EMA)")
         ax1.legend()
-        plot_ema_20_50 = save_plot(fig1, f"ema_20_50_{searched_ticker}.png")
+        plot_path_ema_20_50 = save_plot(fig1, f"ema_20_50_{searched_ticker}.png")
 
         # Long-term plot (full dataset)
         fig2, ax2 = plt.subplots(figsize=(12, 6))
@@ -222,7 +239,7 @@ def index():
         ax2.plot(ema200, 'r', label='EMA 200')
         ax2.set_title(f"Long-Term ({start.date()} to {end.date()}, 100 & 200 Days EMA)")
         ax2.legend()
-        plot_ema_100_200 = save_plot(fig2, f"ema_100_200_{searched_ticker}.png")
+        plot_path_ema_100_200 = save_plot(fig2, f"ema_100_200_{searched_ticker}.png")
 
         # AI prediction plot
         fig3, ax3 = plt.subplots(figsize=(12, 6))
@@ -232,7 +249,7 @@ def index():
         ax3.set_xlabel("Year")
         ax3.set_ylabel("Price (USD)")
         ax3.legend()
-        plot_prediction = save_plot(fig3, f"stock_prediction_{searched_ticker}.png")
+        plot_path_prediction = save_plot(fig3, f"stock_prediction_{searched_ticker}.png")
 
         # 30-Day Future Forecast Plot
         fig4, ax4 = plt.subplots(figsize=(12, 6))
@@ -243,7 +260,7 @@ def index():
         ax4.set_xlabel("Date")
         ax4.set_ylabel("Price (USD)")
         ax4.legend()
-        plot_future_forecast = save_plot(fig4, f"future_forecast_{searched_ticker}.png")
+        plot_path_future_forecast = save_plot(fig4, f"future_forecast_{searched_ticker}.png")
 
         # Save dataset as CSV
         csv_path = f"static/{searched_ticker}_dataset.csv"
@@ -253,10 +270,10 @@ def index():
         return render_template('index.html',
                                searched_ticker=searched_ticker,
                                stock_details=stock_details,
-                               plot_path_ema_20_50=plot_ema_20_50,
-                               plot_path_ema_100_200=plot_ema_100_200,
-                               plot_path_prediction=plot_prediction,
-                               plot_path_future_forecast=plot_future_forecast,
+                               plot_path_ema_20_50=plot_path_ema_20_50,
+                               plot_path_ema_100_200=plot_path_ema_100_200,
+                               plot_path_prediction=plot_path_prediction,
+                               plot_path_future_forecast=plot_path_future_forecast,
                                dataset_link=dataset_link,
                                tradingview_symbol=tradingview_symbol,
                                error_message=error_message)

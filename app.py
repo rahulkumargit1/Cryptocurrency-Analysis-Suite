@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('Agg')  # Non-interactive backend for server environments
 import matplotlib.pyplot as plt
 from tensorflow import keras
 from flask import Flask, render_template, request, send_file
@@ -11,12 +11,16 @@ from sklearn.preprocessing import MinMaxScaler
 import requests
 import time
 import re
+from pathlib import Path
 
 # Set plot style
 plt.style.use("fivethirtyeight")
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='static')
+
+# Ensure static directory exists
+Path("static").mkdir(exist_ok=True)
 
 # CryptoCompare configuration
 CRYPTOCOMPARE_BASE_URL = 'https://min-api.cryptocompare.com/data'
@@ -25,17 +29,14 @@ CRYPTOCOMPARE_BASE_URL = 'https://min-api.cryptocompare.com/data'
 def get_crypto_list():
     url = f'{CRYPTOCOMPARE_BASE_URL}/all/coinlist'
     try:
-        response = requests.get(url)
-        if response.status_code == 200: 
-            data = response.json()
-            if data['Response'] != 'Success':
-                print(f"CryptoCompare coinlist error: {data.get('Message', 'Unknown error')}")
-                return {}
-            return data['Data']
-        else:
-            print(f"CryptoCompare coinlist error: {response.status_code} - {response.text}")
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        if data['Response'] != 'Success':
+            print(f"CryptoCompare coinlist error: {data.get('Message', 'Unknown error')}")
             return {}
-    except Exception as e:
+        return data['Data']
+    except requests.RequestException as e:
         print(f"Error fetching coin list: {e}")
         return {}
 
@@ -54,20 +55,15 @@ def get_historical_data(symbol, start, end, max_retries=5):
     }
     for attempt in range(max_retries):
         try:
-            response = requests.get(url, params=params)
-            if response.status_code == 200:
-                data = response.json()
-                if data['Response'] != 'Success':
-                    print(f"CryptoCompare error: {data.get('Message', 'Unknown error')}")
-                    return []
-                prices = data['Data']
-                return [(item['time'] * 1000, item['close']) for item in prices if item['close'] > 0]
-            else:
-                print(f"CryptoCompare error: {response.status_code} - {response.text}")
-                if attempt == max_retries - 1:
-                    return []
-                time.sleep(2 ** attempt)
-        except Exception as e:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            if data['Response'] != 'Success':
+                print(f"CryptoCompare error: {data.get('Message', 'Unknown error')}")
+                return []
+            prices = data['Data']
+            return [(item['time'] * 1000, item['close']) for item in prices if item['close'] > 0]
+        except requests.RequestException as e:
             print(f"Request failed: {e}")
             if attempt == max_retries - 1:
                 return []
@@ -82,21 +78,18 @@ def get_current_price(symbol):
         'tsyms': tsym
     }
     try:
-        response = requests.get(url, params=params)
-        if response.status_code == 200:
-            data = response.json()
-            return str(data[tsym])
-        else:
-            print(f"CryptoCompare error: {response.status_code} - {response.text}")
-            return None
-    except Exception as e:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return str(data[tsym])
+    except requests.RequestException as e:
         print(f"Error fetching current price: {e}")
         return None
 
 # Load the trained deep learning model
-model_path = r'E:\CRYPTO\stock_dl_model.keras'
+model_path = os.path.join(os.path.dirname(__file__), 'models', 'stock_dl_model.keras')
 if not os.path.exists(model_path):
-    raise FileNotFoundError(f"Model file '{model_path}' not found. Please train or download the model.")
+    raise FileNotFoundError(f"Model file '{model_path}' not found. Ensure the model is placed in the 'models' directory.")
 try:
     model = keras.models.load_model(model_path, compile=False)
     model.compile(optimizer='rmsprop', loss='mse')
@@ -117,11 +110,11 @@ def index():
     error_message = None
 
     if request.method == 'POST':
-        stock = request.form.get('stock') or 'BTC-USD'
-        searched_ticker = stock.upper()
+        stock = request.form.get('stock', 'BTC-USD').upper()
+        searched_ticker = stock
 
         if not re.match(r'^[A-Z]+-USD$', searched_ticker):
-            error_message = f"Error: Invalid ticker format. Use format like 'COIN-USD' (e.g., BTC-USD, LTC-USD)."
+            error_message = "Error: Invalid ticker format. Use format like 'COIN-USD' (e.g., BTC-USD, ETH-USD)."
             return render_template('index.html', error_message=error_message)
 
         symbol = searched_ticker.replace('-', '/')
@@ -132,7 +125,7 @@ def index():
             return render_template('index.html', error_message=error_message)
 
         start = dt.datetime(2000, 1, 1)
-        end = dt.datetime(2024, 10, 1)
+        end = dt.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
         try:
             historical_data = get_historical_data(symbol, start, end)
@@ -151,12 +144,10 @@ def index():
 
             coin_data = crypto_list.get(fsym, {})
             crypto_desc = coin_data.get('Description', f"{fsym} is a cryptocurrency traded against USD.")
-            full_description = f"{crypto_desc} Data sourced from CryptoCompare."
-
             stock_details = {
                 "name": searched_ticker,
                 "current_price": current_price,
-                "description": full_description
+                "description": f"{crypto_desc} Data sourced from CryptoCompare."
             }
         except Exception as e:
             print(f"Error fetching data from CryptoCompare: {e}")
@@ -185,7 +176,7 @@ def index():
         x_data = [scaled_data[i-100:i] for i in range(100, len(scaled_data))]
         x_data = np.array(x_data)
         if x_data.size == 0:
-            error_message = f"Error: Insufficient data for prediction (need at least 100 days)."
+            error_message = "Error: Insufficient data for prediction (need at least 100 days)."
             return render_template('index.html', error_message=error_message)
         y_predicted_scaled = model.predict(x_data, verbose=0)
         y_predicted = scaler.inverse_transform(y_predicted_scaled).flatten()
@@ -207,7 +198,7 @@ def index():
         # Function to save plots
         def save_plot(fig, filename):
             path = os.path.join("static", filename)
-            fig.savefig(path, bbox_inches='tight')
+            fig.savefig(path, bbox_inches='tight', dpi=100)
             plt.close(fig)
             return filename
 
@@ -222,7 +213,7 @@ def index():
         ax1.plot(ema50_recent, 'r', label='EMA 50')
         ax1.set_title("Short-Term (Last 365 Days, 20 & 50 Days EMA)")
         ax1.legend()
-        plot_ema_20_50 = save_plot(fig1, "ema_20_50.png")
+        plot_ema_20_50 = save_plot(fig1, f"ema_20_50_{searched_ticker}.png")
 
         # Long-term plot (full dataset)
         fig2, ax2 = plt.subplots(figsize=(12, 6))
@@ -231,7 +222,7 @@ def index():
         ax2.plot(ema200, 'r', label='EMA 200')
         ax2.set_title(f"Long-Term ({start.date()} to {end.date()}, 100 & 200 Days EMA)")
         ax2.legend()
-        plot_ema_100_200 = save_plot(fig2, "ema_100_200.png")
+        plot_ema_100_200 = save_plot(fig2, f"ema_100_200_{searched_ticker}.png")
 
         # AI prediction plot
         fig3, ax3 = plt.subplots(figsize=(12, 6))
@@ -241,7 +232,7 @@ def index():
         ax3.set_xlabel("Year")
         ax3.set_ylabel("Price (USD)")
         ax3.legend()
-        plot_prediction = save_plot(fig3, "stock_prediction.png")
+        plot_prediction = save_plot(fig3, f"stock_prediction_{searched_ticker}.png")
 
         # 30-Day Future Forecast Plot
         fig4, ax4 = plt.subplots(figsize=(12, 6))
@@ -252,7 +243,7 @@ def index():
         ax4.set_xlabel("Date")
         ax4.set_ylabel("Price (USD)")
         ax4.legend()
-        plot_future_forecast = save_plot(fig4, "future_forecast.png")
+        plot_future_forecast = save_plot(fig4, f"future_forecast_{searched_ticker}.png")
 
         # Save dataset as CSV
         csv_path = f"static/{searched_ticker}_dataset.csv"
@@ -274,11 +265,16 @@ def index():
 
 @app.route('/download/<filename>')
 def download_file(filename):
-    return send_file(f"static/{filename}", as_attachment=True)
+    safe_filename = re.sub(r'[^a-zA-Z0-9_\-.]', '', filename)
+    file_path = os.path.join("static", safe_filename)
+    if not os.path.exists(file_path):
+        return "File not found", 404
+    return send_file(file_path, as_attachment=True)
 
 @app.route('/favicon.ico')
 def favicon():
     return send_file(os.path.join('static', 'images', 'favicon.png'), mimetype='image/png')
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # For local development only; use Gunicorn or similar for production
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
